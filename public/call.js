@@ -2,6 +2,12 @@ const $ = id => document.getElementById(id);
 
 let ws = null;
 let stream = null;
+let broadcastFileUrl = null;
+let broadcasting = false;
+let broadcastTracks = { video: null, audio: null };
+let broadcastBusy = false;
+const broadcastStatus = message => { const el = $('broadcast-status'); if (el) el.textContent = message; };
+
 let facing = 'user';
 let myPeerId = null;
 let myRole = window.ONT_ROLE || 'client'; // fixed by route
@@ -59,12 +65,51 @@ const sendSignal = (type, data = {}) => {
   }
 };
 
+// Keep a valid outgoing video sender even when the device has no camera.
+// The placeholder is a black canvas, not a simulated camera feed.
+let placeholderCanvas = null;
+let placeholderInterval = null;
+function placeholderVideoTrack() {
+  if (!HTMLCanvasElement.prototype.captureStream) return null;
+  placeholderCanvas = document.createElement('canvas');
+  placeholderCanvas.width = 640;
+  placeholderCanvas.height = 360;
+  const ctx = placeholderCanvas.getContext('2d');
+  const draw = () => {
+    ctx.fillStyle = '#06101e'; ctx.fillRect(0, 0, 640, 360);
+    ctx.fillStyle = '#aabbd1'; ctx.font = '22px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('Camera unavailable', 320, 180);
+  };
+  draw();
+  placeholderInterval = setInterval(draw, 1000);
+  return placeholderCanvas.captureStream(2).getVideoTracks()[0] || null;
+}
 async function openCamera() {
   if (stream) return stream;
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: { facingMode: facing }
-  });
+  const tracks = [];
+  const issues = [];
+  if (navigator.mediaDevices?.getUserMedia) {
+    // Independent requests ensure a missing camera does not prevent microphone use.
+    try {
+      const video = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing}, audio: false});
+      tracks.push(...video.getVideoTracks());
+    } catch (error) { issues.push('Camera: ' + error.message); }
+    try {
+      const audio = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+      tracks.push(...audio.getAudioTracks());
+    } catch (error) { issues.push('Microphone: ' + error.message); }
+  } else {
+    issues.push('Camera and microphone APIs unavailable (HTTPS required outside localhost).');
+  }
+  if (!tracks.some(track => track.kind === 'video')) {
+    const placeholder = placeholderVideoTrack();
+    if (placeholder) tracks.push(placeholder);
+  }
+  stream = new MediaStream(tracks);
+  if (issues.length) {
+    const status = $('modal-status');
+    if (status) status.textContent = issues.join(' | ') + ' — You can still join.';
+  }
   return stream;
 }
 
@@ -78,6 +123,7 @@ function renderVideoLayout() {
     $('header-brand-sub').textContent = 'Admin Monitoring Dashboard';
     $('admin-nav').style.display = 'flex';
     $('admin-actions').style.display = 'block';
+    $('admin-video-broadcast').style.display = 'block';
 
     const totalSlots = 4;
     const allPeersList = Array.from(peers.values());
@@ -126,6 +172,7 @@ function renderVideoLayout() {
     $('header-brand-sub').textContent = `${myDisplayName} • Monitoring`;
     $('admin-nav').style.display = 'none';
     $('admin-actions').style.display = 'none';
+    $('admin-video-broadcast').style.display = 'none';
 
     const card = document.createElement('div');
     card.className = 'video-card';
@@ -206,7 +253,10 @@ function createPeerConnection(peerId, peerRole, peerDisplayName, isInitiator) {
   peers.set(peerId, peerObj);
 
   if (stream) {
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    stream.getTracks().forEach(track => {
+      const outgoing = broadcasting ? (broadcastTracks[track.kind] || track) : track;
+      pc.addTrack(outgoing, stream);
+    });
   }
 
   pc.ontrack = ev => {
@@ -381,17 +431,110 @@ window.connectCall = async function() {
       ws = null;
     };
   } catch (err) {
-    $('modal-status').textContent = 'Camera/Microphone error: ' + err.message;
+    $('modal-status').textContent = 'Unable to join: ' + err.message;
   }
 };
 
+// Broadcast a local video through the existing WebRTC connections. Admin only.
+function localVideoElement() { return $('broadcast-preview'); }
+function selectedSenders(kind) {
+  return [...peers.values()].flatMap(p => p.pc.getSenders().filter(sender => sender.track?.kind === kind));
+}
+async function replaceOutgoingTracks(kind, track) {
+  const senders = selectedSenders(kind);
+  const done = [];
+  try {
+    for (const sender of senders) {
+      const previous = sender.track;
+      await sender.replaceTrack(track);
+      done.push({ sender, previous });
+    }
+  } catch (error) {
+    await Promise.allSettled(done.map(({sender, previous}) => sender.replaceTrack(previous)));
+    throw error;
+  }
+}
+window.startLocalVideoBroadcast = async function() {
+  if (myRole !== 'admin' || broadcastBusy) return;
+  if (!currentRoom) return broadcastStatus('Create a room first. A camera is not required.');
+  const video = localVideoElement();
+  if (!video.src) return broadcastStatus('Choose a video file first.');
+  if (typeof video.captureStream !== 'function') return broadcastStatus('This browser does not support video captureStream. Try desktop Chrome.');
+  broadcastBusy = true;
+  try {
+    await video.play();
+    // Some browsers create tracks only after playback begins.
+    let captured = video.captureStream();
+    let videoTrack = captured.getVideoTracks()[0];
+    if (!videoTrack) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      captured = video.captureStream();
+      videoTrack = captured.getVideoTracks()[0];
+    }
+    if (!videoTrack) throw new Error('Video capture did not produce a video track. Check file/browser compatibility.');
+    const cameraVideo = stream.getVideoTracks()[0];
+    if (!cameraVideo) throw new Error('No outgoing video track is available in this browser.');
+    const fileAudio = captured.getAudioTracks()[0] || null;
+    const cameraAudio = stream.getAudioTracks()[0] || null;
+    if (broadcasting) await stopLocalVideoBroadcast();
+    await replaceOutgoingTracks('video', videoTrack);
+    try {
+      if (fileAudio && cameraAudio) await replaceOutgoingTracks('audio', fileAudio);
+    } catch (error) {
+      await replaceOutgoingTracks('video', cameraVideo);
+      throw error;
+    }
+    broadcastTracks = {video: videoTrack, audio: fileAudio && cameraAudio ? fileAudio : null};
+    broadcasting = true;
+    broadcastStatus(fileAudio && cameraAudio ? 'Broadcasting local video with file audio.' : 'Broadcasting local video. File audio is unavailable; microphone audio remains active.');
+  } catch (error) {
+    video.pause();
+    broadcastStatus('Broadcast failed: ' + error.message);
+  } finally { broadcastBusy = false; }
+};
+window.stopLocalVideoBroadcast = async function() {
+  if (myRole !== 'admin') return;
+  const video = localVideoElement();
+  if (!broadcasting) { if(video) video.pause(); return; }
+  try {
+    const camVideo = stream?.getVideoTracks()[0];
+    const camAudio = stream?.getAudioTracks()[0];
+    if (camVideo) await replaceOutgoingTracks('video', camVideo);
+    if (broadcastTracks.audio && camAudio) await replaceOutgoingTracks('audio', camAudio);
+    broadcasting = false;
+    broadcastTracks = {video:null,audio:null};
+    video.pause();
+    broadcastStatus(camVideo ? 'Camera or placeholder broadcasting restored.' : 'Video stopped; no camera is available.');
+  } catch(error) { broadcastStatus('Could not restore camera: ' + error.message); }
+};
+window.addEventListener('DOMContentLoaded', () => {
+  const file = $('broadcast-file');
+  if (!file) return;
+  file.addEventListener('change', async () => {
+    if (broadcasting) await stopLocalVideoBroadcast();
+    const video = localVideoElement();
+    video.pause();
+    if (broadcastFileUrl) URL.revokeObjectURL(broadcastFileUrl);
+    broadcastFileUrl = null;
+    const chosen = file.files?.[0];
+    if (!chosen) { video.removeAttribute('src'); video.style.display='none'; return; }
+    broadcastFileUrl = URL.createObjectURL(chosen);
+    video.src = broadcastFileUrl;
+    video.style.display='block';
+    broadcastStatus('Selected: ' + chosen.name + '. Press Broadcast Video to start.');
+  });
+  $('broadcast-preview').addEventListener('ended', () => { if (broadcasting) stopLocalVideoBroadcast(); });
+});
+
 window.endCall = function() {
+  if (myRole === 'admin') { broadcasting = false; broadcastTracks = {video:null,audio:null}; const preview=localVideoElement(); if(preview) preview.pause(); }
   if (ws) {
     sendSignal('hangup');
     ws.close();
     ws = null;
   }
   peers.forEach((_, id) => removePeer(id));
+  if (placeholderInterval) { clearInterval(placeholderInterval); placeholderInterval = null; }
   if (stream) {
     stream.getTracks().forEach(t => t.stop());
     stream = null;

@@ -640,6 +640,18 @@
           </button>
         </div>
 
+        <!-- Admin-only local video broadcasting -->
+        <div id="admin-video-broadcast" style="display:none;margin-top:14px;border-top:1px solid #294662;padding-top:14px">
+          <div class="controls-title">Broadcast Local Video to Clients</div>
+          <input id="broadcast-file" type="file" accept="video/mp4,video/webm,video/*" style="width:100%;margin:6px 0 10px;color:#e2e8f0" aria-label="Choose local video">
+          <video id="broadcast-preview" controls playsinline style="display:none;width:100%;max-height:180px;background:#000;border-radius:8px;margin-bottom:10px"></video>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" id="broadcast-start" style="width:auto;flex:1" onclick="startLocalVideoBroadcast()">▶ Broadcast Video</button>
+            <button class="btn-primary" id="broadcast-stop" style="width:auto;flex:1;background:#334155" onclick="stopLocalVideoBroadcast()">↩ Return to Camera</button>
+          </div>
+          <div id="broadcast-status" role="status" style="color:#94a3b8;font-size:12px;margin-top:8px">Choose an MP4 or WebM video. Camera feed stays available until you broadcast.</div>
+        </div>
+
         <!-- Quick Actions (Admin view) -->
         <div id="admin-actions" style="display:none; margin-top:6px;">
           <button class="btn-reset-timer" onclick="resetTimer()">🔄 Reset Timer</button>
