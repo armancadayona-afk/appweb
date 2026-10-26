@@ -1,30 +1,23 @@
-# RealSMS Video Call - Web Application & Signaling Server
+# On-Tour — Homepage + Admin / Client (preserved WebRTC)
 
-This standalone web application provides a browser-based WebRTC video calling client and WebSocket signaling server.
+This project modifies the uploaded `webapp.zip`, keeping its existing `public/call.js` peer connection implementation and `ws` signaling protocol. It adds a homepage, separate routes, server-enforced Admin password, and removes the hardcoded signaling URL.
 
-## Features
-- **WebRTC Video Calls**: Peer-to-peer audio/video calling directly in web browsers (Chrome, Safari, Firefox, Edge, Mobile Web).
-- **Embedded Signaling Server**: Combined Node.js HTTP web server and WebSocket signaling server running on port 3000 (or `PORT` environment variable).
-- **Auto Server Connection**: Automatically connects to `wss://` on the current domain when hosted live.
-- **Cross-Platform Interoperability**: Compatible with the Android app (`VideoCallActivity`).
+## Render deployment
+- Create a Node Web Service from this project repository.
+- Build: `npm install`
+- Start: `npm start`
+- Environment variables: `ADMIN_PASSWORD` (choose a strong password), `SESSION_SECRET` (random string at least 32 characters).
+- Do not publish these values in source control.
 
-## How to Run Locally
-1. Navigate to the `webapp` folder:
-   ```bash
-   cd webapp
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the server:
-   ```bash
-   npm start
-   ```
-4. Open `http://localhost:3000` in two browser windows or on separate devices on the same local network.
-5. Enter the same 8+ character room code (e.g., `room123456`) and click **Join / Start Call**.
+## URLs
+- `/` homepage
+- `/admin` Admin login, then Admin video dashboard (can create rooms)
+- `/client` Client video dashboard (joins existing rooms)
 
-## Hosting & Deployment
-You can deploy this `webapp` folder to any Node.js cloud host:
-- **Render**: Create a Web Service, connect your repository, set Root Directory to `webapp`, build command `npm install`, start command `npm start`.
-- **Railway / Heroku / Fly.io**: Deploy directly using the provided `package.json` and `server.js`.
+## Testing
+1. Open `/admin`, sign in and enter a room code of 4–64 letters, numbers, `_` or `-`.
+2. Open `/client` on a separate device and enter the same room code.
+3. Allow camera and microphone access on both devices; check video and audio in both directions.
+4. Test incorrect password and try creating a room through an unauthenticated WebSocket client; it must be denied.
+
+**Limitations:** This retains the source app's original WebRTC negotiation. Two-device live camera tests, TURN fallback, and load tests have NOT been performed here. A free STUN-only peer connection may fail across restrictive networks. This application stores rooms in memory and expects one Render instance. Do not use as a public production service without additional security and real-device testing.

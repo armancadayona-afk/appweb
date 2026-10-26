@@ -4,7 +4,7 @@ let ws = null;
 let stream = null;
 let facing = 'user';
 let myPeerId = null;
-let myRole = 'admin'; // 'admin' or 'client'
+let myRole = window.ONT_ROLE || 'client'; // fixed by route
 let myDisplayName = 'Admin';
 let currentRoom = null;
 
@@ -15,16 +15,7 @@ let timerSeconds = 0;
 // Map<peerId, { pc: RTCPeerConnection, role: string, displayName: string, stream: MediaStream, videoEl: HTMLVideoElement }>
 const peers = new Map();
 
-window.setRole = function(role) {
-  myRole = role;
-  if (role === 'admin') {
-    $('btn-role-admin').classList.add('active');
-    $('btn-role-client').classList.remove('active');
-  } else {
-    $('btn-role-client').classList.add('active');
-    $('btn-role-admin').classList.remove('active');
-  }
-};
+window.setRole = function() {}; // Role is determined by the server page
 
 window.switchTab = function(tab) {
   if (tab === 'chat') {
@@ -343,7 +334,8 @@ async function handleSignal(data) {
 }
 
 window.connectCall = async function() {
-  const url = $('server-url').value.trim();
+  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
+  $('server-url').value = url;
   const room = $('room-code').value.trim();
 
   if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
@@ -434,3 +426,5 @@ window.toggleFullscreen = function() {
     document.exitFullscreen().catch(() => {});
   }
 };
+
+window.addEventListener('DOMContentLoaded', () => { myRole = window.ONT_ROLE || 'client'; const s=document.getElementById('server-url'); if(s) s.value=(location.protocol==='https:'?'wss://':'ws://')+location.host; const r=new URLSearchParams(location.search).get('room'); if(r) document.getElementById('room-code').value=r; });

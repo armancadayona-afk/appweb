@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>On-Tour | Live Apartment Tours</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0b1329;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Setup / Entry Modal */
+    #setup-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 19, 41, 0.94);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .setup-card {
+      background: #121e38;
+      border: 1px solid #1c2c4d;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+    .setup-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      background: #0b1329;
+      border: 1px solid #1c2c4d;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: #38bdf8;
+    }
+    .role-options {
+      display: flex;
+      gap: 10px;
+    }
+    .role-btn {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      border: 2px solid #1c2c4d;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      background: #0b1329;
+      color: #94a3b8;
+    }
+    .role-btn.active {
+      border-color: #38bdf8;
+      background: #0f2744;
+      color: #38bdf8;
+    }
+    .btn-primary {
+      width: 100%;
+      background: #0066ff;
+      color: white;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-primary:hover { background: #0052cc; }
+
+    /* Top Bar Header */
+    header {
+      background: #0f1a30;
+      border-bottom: 1px solid #1c2c4d;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: #0066ff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-live {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Admin Nav Links (visible in Admin view) */
+    .admin-nav {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #94a3b8;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .nav-item.active {
+      background: #182642;
+      color: #fff;
+    }
+
+    /* Header Right Info */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .timer-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .conn-badge {
+      font-size: 12px;
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-endcall {
+      background: #dc2626;
+      color: white;
+      border: 0;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-endcall:hover { background: #b91c1c; }
+
+    /* Main Container */
+    .app-body {
+      flex: 1;
+      display: flex;
+      padding: 16px;
+      gap: 16px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Left Section: Video Display */
+    .video-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Admin 2x2 Grid Layout */
+    .admin-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      min-height: 480px;
+    }
+
+    /* Client Focused Layout */
+    .client-focus {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 480px;
+    }
+
+    .video-card {
+      position: relative;
+      background: #121e38;
+      border: 1px solid #1c2c4d;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-card video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .card-badge-top {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(15, 26, 48, 0.75);
+      backdrop-filter: blur(4px);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+    .dot-online {
+      width: 7px;
+      height: 7px;
+      background: #10b981;
+      border-radius: 50%;
+    }
+    .card-badge-bottom {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(15, 26, 48, 0.75);
+      backdrop-filter: blur(4px);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 10;
+    }
+
+    /* Right Sidebar Section */
+    .sidebar-section {
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-card {
+      background: #121e38;
+      border: 1px solid #1c2c4d;
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Tabs Header */
+    .tabs-header {
+      display: flex;
+      background: #0b1329;
+      padding: 3px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      color: #94a3b8;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .tab-btn.active {
+      background: #182642;
+      color: #fff;
+    }
+
+    /* Chat Area */
+    .chat-body {
+      flex: 1;
+      min-height: 260px;
+      max-height: 320px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+    .chat-msg {
+      display: flex;
+      gap: 8px;
+      max-width: 85%;
+    }
+    .chat-msg.mine {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .chat-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1e3a8a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #38bdf8;
+      flex-shrink: 0;
+    }
+    .chat-content {
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-meta {
+      font-size: 10px;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+    .chat-bubble {
+      background: #182642;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .chat-msg.mine .chat-bubble {
+      background: #0066ff;
+      color: #fff;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .chat-input {
+      flex: 1;
+      background: #0b1329;
+      border: 1px solid #1c2c4d;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .btn-send {
+      background: #0066ff;
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    /* Participants List */
+    .participants-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 260px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .participant-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      border-radius: 8px;
+      background: #0b1329;
+    }
+    .part-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .part-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    /* Call Controls Grid */
+    .controls-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .ctrl-btn {
+      background: #182642;
+      border: 1px solid #1c2c4d;
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #cbd5e1;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .ctrl-btn.active {
+      background: #0066ff;
+      color: #fff;
+    }
+    .ctrl-btn span { font-size: 16px; }
+
+    .btn-reset-timer {
+      background: #182642;
+      border: 1px solid #1c2c4d;
+      color: #cbd5e1;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    @media (max-width: 900px) {
+      .app-body {
+        flex-direction: column;
+      }
+      .sidebar-section {
+        width: 100%;
+      }
+      .admin-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+      .admin-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<a id="admin-logout" style="display:none;position:fixed;top:8px;right:10px;z-index:900;background:#b42332;color:white;padding:8px 13px;border-radius:9px;text-decoration:none" href="#">Logout</a>
+
+  <!-- Entry / Role Selection Modal -->
+  <div id="setup-modal">
+    <div class="setup-card">
+      <div class="setup-title">
+        <span style="font-size:22px;">🛡️</span> On-Tour Live Call
+      </div>
+      <div class="form-group">
+        <label for="server-url">Signaling Server URL</label>
+        <input id="server-url" value="" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="room-code">Room Code</label>
+        <input id="room-code" placeholder="Enter room code (e.g. room101)">
+      </div>
+      <button class="btn-primary" id="btn-connect" onclick="connectCall()">Connect / Join Call</button>
+      <div id="modal-status" style="margin-top:10px; font-size:12px; color:#ef4444;"></div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <div class="brand-title">
+          <span id="header-brand-name">On-Tour</span>
+          <span class="badge-live">● Live</span>
+        </div>
+        <div class="brand-sub" id="header-brand-sub">On-Tour • Live Presentation</div>
+      </div>
+    </div>
+
+    <!-- Admin Nav (Shown in Admin view) -->
+    <div class="admin-nav" id="admin-nav" style="display:none;">
+      <div class="nav-item active">🏠 Dashboard</div>
+      <div class="nav-item">👥 Workers</div>
+      <div class="nav-item">💻 Devices</div>
+      <div class="nav-item">📋 Task</div>
+      <div class="nav-item">💬 Chat</div>
+      <div class="nav-item">💰 Earning</div>
+    </div>
+
+    <!-- Header Right Timer & Controls -->
+    <div class="header-right">
+      <div class="timer-badge">
+        <span>⏱️</span> <span id="call-timer">00:00:00</span>
+      </div>
+      <div class="conn-badge">
+        <span>📶</span> Good Connection
+      </div>
+      <button class="btn-endcall" onclick="endCall()">📞 End Call</button>
+    </div>
+  </header>
+
+  <!-- App Body Layout -->
+  <main class="app-body">
+
+    <!-- Video Area -->
+    <section class="video-section">
+      <div id="video-container" class="client-focus">
+        <!-- Rendered by call.js based on role -->
+      </div>
+    </section>
+
+    <!-- Sidebar Area: Chat, Participants, Controls -->
+    <aside class="sidebar-section">
+
+      <!-- Chat / Participants Panel -->
+      <div class="panel-card">
+        <div class="tabs-header">
+          <button class="tab-btn active" id="tab-chat-btn" onclick="switchTab('chat')">💬 Chat</button>
+          <button class="tab-btn" id="tab-parts-btn" onclick="switchTab('participants')">👥 Participants (<span id="part-count">1</span>)</button>
+        </div>
+
+        <!-- Chat View -->
+        <div id="view-chat">
+          <div class="chat-body" id="chat-messages">
+            <!-- Messages added dynamically -->
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChat()">
+            <button class="btn-send" onclick="sendChat()">✈</button>
+          </div>
+        </div>
+
+        <!-- Participants View -->
+        <div id="view-participants" style="display:none;">
+          <div class="participants-list" id="participants-container">
+            <!-- Participants added dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Call Controls Panel -->
+      <div class="panel-card">
+        <div class="controls-title">Call Controls</div>
+        <div class="controls-grid">
+          <button class="ctrl-btn" id="btn-audio" onclick="toggleAudio()">
+            <span id="icon-audio">🎙️</span>
+            <label id="lbl-audio">Audio</label>
+          </button>
+          <button class="ctrl-btn" id="btn-record" onclick="toggleRecord()">
+            <span>🔴</span>
+            <label>Record</label>
+          </button>
+          <button class="ctrl-btn" id="btn-zoom" onclick="toggleZoom()">
+            <span>🔍</span>
+            <label>Zoom</label>
+          </button>
+          <button class="ctrl-btn" onclick="toggleFullscreen()">
+            <span>⛶</span>
+            <label>Full Screen</label>
+          </button>
+        </div>
+
+        <!-- Quick Actions (Admin view) -->
+        <div id="admin-actions" style="display:none; margin-top:6px;">
+          <button class="btn-reset-timer" onclick="resetTimer()">🔄 Reset Timer</button>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <script src="/call.js"></script>
+<script>window.ONT_ROLE = location.pathname === "/admin" ? "admin" : "client";
+if(window.ONT_ROLE==='admin'){const b=document.getElementById('admin-logout');b.style.display='block';b.onclick=async e=>{e.preventDefault();await fetch('/api/admin/logout',{method:'POST'});location.href='/admin';};}</script>
+</body>
+</html>
