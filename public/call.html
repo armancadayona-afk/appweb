@@ -531,11 +531,6 @@
         <span style="font-size:22px;">🛡️</span> On-Tour Live Call
       </div>
       <div class="form-group">
-        <label for="server-url">Signaling Server URL</label>
-        <input id="server-url" value="" readonly>
-      </div>
-
-      <div class="form-group">
         <label for="room-code">Room Code</label>
         <input id="room-code" placeholder="Enter room code (e.g. room101)">
       </div>
@@ -663,7 +658,8 @@
   </main>
 
   <script src="/call.js"></script>
-<script>window.ONT_ROLE = location.pathname === "/admin" ? "admin" : "client";
-if(window.ONT_ROLE==='admin'){const b=document.getElementById('admin-logout');b.style.display='block';b.onclick=async e=>{e.preventDefault();await fetch('/api/admin/logout',{method:'POST'});location.href='/admin';};}</script>
+<!-- ONTOUR_ROLE_BOOTSTRAP -->
+<script>
+if(window.ONT_ROLE==='admin'){const b=document.getElementById('admin-logout');b.style.display='block';b.onclick=async e=>{e.preventDefault();await fetch('/api/admin/logout',{method:'POST'});location.href=location.pathname;};}</script>
 </body>
 </html>

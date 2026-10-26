@@ -32,3 +32,17 @@ This depends on browser `HTMLMediaElement.captureStream()` support and media cod
 
 ## Camera-optional mode
 Both Admin and Client can join without a detected or permitted camera. Video and microphone permissions are requested separately. When no camera is available, a black canvas placeholder creates an outgoing video sender, allowing the Admin to broadcast a selected MP4/WebM file through the existing replaceTrack() implementation. When no microphone is available, the call proceeds without microphone audio. On browsers without canvas captureStream, a file broadcast may be unavailable. Live camera/media connectivity still requires a real-device test.
+
+## UI update
+The signaling server URL is automatically derived from the current website and is not shown to Admin or Client.
+
+
+## New homepage and private Admin link
+
+- `/` is the public homepage with a room-code entry form.
+- `/client?room=CODE` opens the Client join screen with the room prefilled.
+- Admin login is **not linked from the homepage**. Its unique URL is generated deterministically from `SESSION_SECRET`.
+- In Render logs, find the line `Private Admin login path: /studio-...` and append it to your service URL. Save that link privately.
+- Admin authentication still requires `ADMIN_PASSWORD`; a hidden URL is not a replacement for a password.
+- Do not change `SESSION_SECRET` unless you intend to change the private Admin link and invalidate existing sessions.
+- The WebRTC and local video broadcast code is retained; actual media playback must be tested after deploying.

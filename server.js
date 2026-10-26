@@ -11,6 +11,7 @@ if (!ADMIN_PASSWORD || !SESSION_SECRET || SESSION_SECRET.length < 32) {
   console.error('Set ADMIN_PASSWORD and SESSION_SECRET (32+ characters) before starting.');
   process.exit(1);
 }
+const ADMIN_PATH = '/studio-' + crypto.createHmac('sha256', SESSION_SECRET).update('ontour-admin-private-route').digest('hex').slice(0, 16);
 const loginAttempts = new Map();
 function cookies(req) { return Object.fromEntries((req.headers.cookie || '').split(';').map(v => v.trim().split(/=(.*)/s).slice(0,2)).filter(v => v.length === 2)); }
 function signature(payload) { return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex'); }
@@ -58,9 +59,9 @@ const server = http.createServer((req, res) => {
   }
   if (pathname === '/api/admin/logout' && req.method === 'POST') return respond(res,200,{ok:true},{'Set-Cookie':'ontour_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'});
   if (pathname === '/api/admin/status') return respond(res,200,{ authenticated:isAdmin(req) });
-  if (pathname === '/admin') {
+  if (pathname === ADMIN_PATH) {
     res.writeHead(200, {'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store'});
-    res.end(isAdmin(req) ? fs.readFileSync(path.join(PUBLIC_DIR,'call.html'),'utf8') : fs.readFileSync(path.join(PUBLIC_DIR,'login.html'),'utf8'));
+    res.end(isAdmin(req) ? fs.readFileSync(path.join(PUBLIC_DIR,'call.html'),'utf8').replace('<!-- ONTOUR_ROLE_BOOTSTRAP -->', '<script>window.ONT_ROLE = \"admin\";</script>') : fs.readFileSync(path.join(PUBLIC_DIR,'login.html'),'utf8'));
     return;
   }
   const allowed = {'/':'index.html','/client':'call.html','/call.js':'call.js'};
@@ -70,7 +71,7 @@ const server = http.createServer((req, res) => {
   fs.readFile(path.join(PUBLIC_DIR,file), (err, content) => {
     if (err) { res.writeHead(500); res.end('Server Error'); return; }
     res.writeHead(200, {'Content-Type': MIME_TYPES[ext] || 'text/html; charset=utf-8', 'Cache-Control':'no-store'});
-    res.end(content);
+    res.end(file === 'call.html' ? String(content).replace('<!-- ONTOUR_ROLE_BOOTSTRAP -->', '<script>window.ONT_ROLE = \"client\";</script>') : content);
   });
 });
 
@@ -253,3 +254,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Admin-Client Web App & Signaling Server running on port ${PORT}`);
 });
+
+console.log('Private Admin login path: ' + ADMIN_PATH);

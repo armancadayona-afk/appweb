@@ -385,7 +385,6 @@ async function handleSignal(data) {
 
 window.connectCall = async function() {
   const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
-  $('server-url').value = url;
   const room = $('room-code').value.trim();
 
   if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
@@ -570,4 +569,4 @@ window.toggleFullscreen = function() {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => { myRole = window.ONT_ROLE || 'client'; const s=document.getElementById('server-url'); if(s) s.value=(location.protocol==='https:'?'wss://':'ws://')+location.host; const r=new URLSearchParams(location.search).get('room'); if(r) document.getElementById('room-code').value=r; });
+window.addEventListener('DOMContentLoaded', () => { myRole = window.ONT_ROLE || 'client'; const r=new URLSearchParams(location.search).get('room'); if(r) document.getElementById('room-code').value=r; });
