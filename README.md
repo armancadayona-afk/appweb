@@ -54,3 +54,7 @@ Clients who request to join remain in a waiting room. The Admin sees pending req
 
 ## Client display names
 After entering a room code, Clients enter a name (2–40 characters) before requesting admission. The server validates the name, shows it to the Admin in the waiting room, and uses it in the participant list and chat after approval. Names are session-only; no registration or database is required.
+
+
+## Client participant monitor update
+After Admin approval, Client now sees the Admin presentation, every approved participant with a peer connection, and their own muted camera preview. Waiting users are not shown. Existing WebRTC peer negotiation and server approval logic were not changed.

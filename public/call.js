@@ -186,44 +186,53 @@ function renderVideoLayout() {
       container.appendChild(card);
     }
   } else {
-    // Client View: Focused Main Video (Image 1 Template)
-    container.className = 'client-focus';
-    $('header-brand-sub').textContent = `${myDisplayName} • Monitoring`;
+    // Client View: Admin presentation plus every approved participant's live video.
+    // This uses the existing per-peer WebRTC streams and does not alter signaling.
+    container.className = 'client-participant-layout';
+    container.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;align-content:start;overflow-y:auto;padding:12px;';
+    $('header-brand-sub').textContent = `${myDisplayName} • Live Tour`;
     $('admin-nav').style.display = 'none';
     $('admin-actions').style.display = 'none';
     $('admin-video-broadcast').style.display = 'none';
 
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.style.height = '100%';
+    const allVideos = [
+      ...Array.from(peers.entries()).map(([id, peer]) => ({
+        id, name: peer.displayName, role: peer.role, media: peer.stream, peer, self: false
+      })),
+      { id: myPeerId || 'self', name: myDisplayName, role: 'client', media: stream, self: true }
+    ];
+    allVideos.sort((a, b) => (a.role === 'admin' ? -1 : b.role === 'admin' ? 1 : 0));
 
-    const videoEl = document.createElement('video');
-    videoEl.autoplay = true;
-    videoEl.playsInline = true;
+    for (const item of allVideos) {
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      card.style.cssText = 'position:relative;min-height:210px;aspect-ratio:16/10;overflow:hidden;';
+      if (item.role === 'admin') card.style.gridColumn = '1 / -1';
 
-    const topBadge = document.createElement('div');
-    topBadge.className = 'card-badge-top';
+      const videoEl = document.createElement('video');
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      videoEl.muted = item.self; // Prevent local audio feedback.
+      videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#071321;';
+      if (item.media) videoEl.srcObject = item.media;
+      if (item.peer) item.peer.videoEl = videoEl;
 
-    const botBadge = document.createElement('div');
-    botBadge.className = 'card-badge-bottom';
+      const topBadge = document.createElement('div');
+      topBadge.className = 'card-badge-top';
+      topBadge.textContent = `${item.name}${item.self ? ' (You)' : ''}${item.role === 'admin' ? ' • Host' : ''}`;
+      const botBadge = document.createElement('div');
+      botBadge.className = 'card-badge-bottom';
+      botBadge.textContent = item.media?.getVideoTracks().some(t => t.readyState === 'live') ? 'Live camera' : 'Waiting for video';
 
-    const adminPeer = Array.from(peers.values()).find(p => p.role === 'admin') || Array.from(peers.values())[0];
-
-    if (adminPeer && adminPeer.stream) {
-      videoEl.srcObject = adminPeer.stream;
-      topBadge.innerHTML = `<span class="dot-online"></span> ${escapeHtml(adminPeer.displayName)} (Live View)`;
-      botBadge.textContent = adminPeer.displayName;
-    } else if (stream) {
-      videoEl.srcObject = stream;
-      videoEl.muted = true;
-      topBadge.innerHTML = `<span class="dot-online"></span> ${myDisplayName} (My Camera)`;
-      botBadge.textContent = myDisplayName;
+      card.appendChild(videoEl);
+      card.appendChild(topBadge);
+      card.appendChild(botBadge);
+      container.appendChild(card);
+      if (item.media && !item.self) videoEl.play().catch(() => {
+        botBadge.textContent = 'Tap video to play';
+        videoEl.controls = true;
+      });
     }
-
-    card.appendChild(videoEl);
-    card.appendChild(topBadge);
-    card.appendChild(botBadge);
-    container.appendChild(card);
   }
 
   updateParticipantsUI();
