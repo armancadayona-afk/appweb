@@ -1,0 +1,16 @@
+{
+  "name": "real-sms-videocall-webapp",
+  "version": "1.0.0",
+  "description": "Standalone WebRTC Video Calling Web App & Signaling Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

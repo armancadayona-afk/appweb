@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RealSMS Video Call - Web App</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff1f8;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #5a2d48;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #e74791;
+      margin-top: 10px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #ffbfda;
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 20px rgba(231, 71, 145, 0.08);
+    }
+    label {
+      display: block;
+      margin: 12px 0 4px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      border: 1px solid #eaa1c8;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 15px;
+      outline: none;
+    }
+    input:focus {
+      border-color: #e74791;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    button {
+      border: 0;
+      border-radius: 12px;
+      background: #e74791;
+      color: white;
+      font-weight: 700;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background: #d43680;
+    }
+    button.secondary {
+      background: #895770;
+    }
+    button.secondary:hover {
+      background: #73455d;
+    }
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    @media (min-width: 600px) {
+      .video-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    video {
+      background: #1b1320;
+      border-radius: 12px;
+      width: 100%;
+      min-height: 200px;
+      max-height: 360px;
+      object-fit: cover;
+    }
+    #status {
+      padding: 8px 0;
+      font-weight: 600;
+      color: #83476c;
+    }
+    small {
+      color: #885f77;
+      display: block;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>♡ RealSMS Video Call Web App</h1>
+    <div class="panel">
+      <label>Signaling WebSocket (WSS / WS)</label>
+      <input id="server" placeholder="wss://your-app.onrender.com" autocomplete="off">
+
+      <label>Private call room (8+ letters or numbers)</label>
+      <input id="room" placeholder="Enter the same room code on both devices">
+
+      <div class="controls">
+        <button id="join">Join / Start Call</button>
+        <button class="secondary" id="hang">Hang Up</button>
+        <button class="secondary" id="mute">Mute mic</button>
+        <button class="secondary" id="camera">Camera off</button>
+        <button class="secondary" id="flip">Switch camera</button>
+      </div>
+
+      <p id="status" aria-live="polite">Ready</p>
+      <small>Enter the same room code on both devices (e.g. PC browser & Android phone). Keep the app open during calls.</small>
+    </div>
+
+    <div class="video-grid">
+      <div>
+        <h3>Remote video</h3>
+        <video id="remote" autoplay playsinline></video>
+      </div>
+      <div>
+        <h3>My camera</h3>
+        <video id="local" autoplay playsinline muted></video>
+      </div>
+    </div>
+  </main>
+  <script src="call.js"></script>
+</body>
+</html>
