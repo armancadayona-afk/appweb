@@ -20,6 +20,24 @@ let timerSeconds = 0;
 
 // Map<peerId, { pc: RTCPeerConnection, role: string, displayName: string, stream: MediaStream, videoEl: HTMLVideoElement }>
 const peers = new Map();
+const pendingRequests = new Map();
+let waitingForApproval = false;
+function renderWaitingRequests() {
+  const panel=$('waiting-requests-panel'), list=$('waiting-requests-list');
+  if (!panel || !list) return;
+  panel.style.display=myRole==='admin'?'block':'none';
+  $('waiting-count').textContent='('+pendingRequests.size+')';
+  list.replaceChildren();
+  for (const [id,name] of pendingRequests) {
+    const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap';
+    const label=document.createElement('span');label.textContent=name;row.appendChild(label);
+    for (const [title,type,color] of [['Approve','approve-join','#0e9f6e'],['Deny','deny-join','#b42332']]) {
+      const btn=document.createElement('button');btn.textContent=title;btn.style.cssText='background:'+color+';color:white;border:0;border-radius:7px;padding:9px;cursor:pointer';
+      btn.onclick=()=>{sendSignal(type,{target:id});pendingRequests.delete(id);renderWaitingRequests();};row.appendChild(btn);
+    } list.appendChild(row);
+  }
+}
+
 
 window.setRole = function() {}; // Role is determined by the server page
 
@@ -124,6 +142,7 @@ function renderVideoLayout() {
     $('admin-nav').style.display = 'flex';
     $('admin-actions').style.display = 'block';
     $('admin-video-broadcast').style.display = 'block';
+    renderWaitingRequests();
 
     const totalSlots = 4;
     const allPeersList = Array.from(peers.values());
@@ -145,7 +164,7 @@ function renderVideoLayout() {
 
       if (i < allPeersList.length) {
         const peer = allPeersList[i];
-        topBadge.innerHTML = `<span class="dot-online"></span> ${peer.displayName} • On Call`;
+        topBadge.innerHTML = `<span class="dot-online"></span> ${escapeHtml(peer.displayName)} • On Call`;
         botBadge.textContent = peer.displayName;
         if (peer.stream) videoEl.srcObject = peer.stream;
         peer.videoEl = videoEl;
@@ -192,7 +211,7 @@ function renderVideoLayout() {
 
     if (adminPeer && adminPeer.stream) {
       videoEl.srcObject = adminPeer.stream;
-      topBadge.innerHTML = `<span class="dot-online"></span> ${adminPeer.displayName} (Live View)`;
+      topBadge.innerHTML = `<span class="dot-online"></span> ${escapeHtml(adminPeer.displayName)} (Live View)`;
       botBadge.textContent = adminPeer.displayName;
     } else if (stream) {
       videoEl.srcObject = stream;
@@ -227,7 +246,7 @@ function updateParticipantsUI() {
     row.innerHTML = `
       <div class="part-info">
         <div class="part-icon">${p.role === 'admin' ? '🛡️' : '👤'}</div>
-        <div>${p.displayName} ${p.isSelf ? '(You)' : ''}</div>
+        <div>${escapeHtml(p.displayName)} ${p.isSelf ? '(You)' : ''}</div>
       </div>
       <div style="font-size:12px; color:#10b981; display:flex; align-items:center; gap:4px;">
         ● Online 📶
@@ -305,9 +324,9 @@ function addChatMessage(senderName, text, time, isMine) {
   msgDiv.className = `chat-msg ${isMine ? 'mine' : ''}`;
 
   msgDiv.innerHTML = `
-    <div class="chat-avatar">${senderName.charAt(0)}</div>
+    <div class="chat-avatar">${escapeHtml(senderName.charAt(0))}</div>
     <div class="chat-content">
-      <div class="chat-meta">${senderName} • ${time}</div>
+      <div class="chat-meta">${escapeHtml(senderName)} • ${escapeHtml(String(time))}</div>
       <div class="chat-bubble">${escapeHtml(text)}</div>
     </div>
   `;
@@ -329,7 +348,31 @@ async function handleSignal(data) {
     return;
   }
 
+  if (type === 'waiting') {
+    waitingForApproval = true;
+    $('waiting-message').style.display='block';
+    $('btn-connect').disabled=true;
+    $('btn-connect').textContent='Approval Pending';
+    $('modal-status').textContent='Your request was sent to the Admin.';
+    return;
+  }
+  if (type === 'join-request' && myRole === 'admin') {
+    pendingRequests.set(peerId, displayName || 'Guest');renderWaitingRequests();return;
+  }
+  if (type === 'request-cancelled' && myRole === 'admin') {
+    pendingRequests.delete(peerId);renderWaitingRequests();return;
+  }
+  if (type === 'join-denied') {
+    waitingForApproval=false;
+    $('waiting-message').style.display='none';
+    $('btn-connect').disabled=false;$('btn-connect').textContent='Connect / Join Call';
+    $('modal-status').textContent=message || 'Request denied.';
+    if(ws)ws.close();return;
+  }
   if (type === 'created' || type === 'joined') {
+    waitingForApproval=false;
+    $('waiting-message').style.display='none';
+    $('btn-connect').disabled=false;$('btn-connect').textContent='Connect / Join Call';
     myPeerId = peerId;
     myDisplayName = displayName;
     currentRoom = room;
@@ -337,6 +380,7 @@ async function handleSignal(data) {
     $('setup-modal').style.display = 'none';
     startTimer();
 
+    if (!stream) await openCamera();
     existingPeers.forEach(p => {
       createPeerConnection(p.peerId, p.role, p.displayName, true);
     });
@@ -397,11 +441,16 @@ window.connectCall = async function() {
     return;
   }
 
+  const clientName = myRole === 'client' ? ($('client-display-name').value || '').trim().replace(/\s+/g, ' ') : '';
+  if (myRole === 'client' && (clientName.length < 2 || clientName.length > 40 || /[<>\x00-\x1f\x7f]/.test(clientName))) {
+    $('modal-status').textContent = 'Please enter your name (2–40 characters).';
+    $('client-display-name').focus();
+    return;
+  }
   try {
-    $('modal-status').textContent = 'Accessing camera & microphone...';
-    await openCamera();
+    $('modal-status').textContent = myRole === 'admin' ? 'Preparing Admin room...' : 'Requesting admission...';
+    if (myRole === 'admin') await openCamera();
 
-    localStorage.setItem('signal', url);
     localStorage.setItem('room', room);
 
     ws = new WebSocket(url);
@@ -410,7 +459,7 @@ window.connectCall = async function() {
       if (myRole === 'admin') {
         sendSignal('create-room', { room });
       } else {
-        sendSignal('join-room', { room });
+        sendSignal('join-room', { room, displayName: clientName });
       }
     };
 
@@ -423,11 +472,12 @@ window.connectCall = async function() {
     };
 
     ws.onerror = () => {
-      $('modal-status').textContent = 'Cannot connect to signaling server at ' + url;
+      $('modal-status').textContent = 'Cannot connect to the service.';
     };
 
     ws.onclose = () => {
       ws = null;
+      if(waitingForApproval) {waitingForApproval=false;$('waiting-message').style.display='none';$('btn-connect').disabled=false;$('btn-connect').textContent='Connect / Join Call';$('modal-status').textContent='Disconnected while waiting. Please retry.';}
     };
   } catch (err) {
     $('modal-status').textContent = 'Unable to join: ' + err.message;
@@ -539,6 +589,8 @@ window.endCall = function() {
     stream = null;
   }
   if (timerInterval) clearInterval(timerInterval);
+  pendingRequests.clear();renderWaitingRequests();waitingForApproval=false;
+  $('waiting-message').style.display='none';$('btn-connect').disabled=false;$('btn-connect').textContent='Connect / Join Call';
   $('setup-modal').style.display = 'flex';
   $('modal-status').textContent = 'Call ended.';
 };
@@ -569,4 +621,4 @@ window.toggleFullscreen = function() {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => { myRole = window.ONT_ROLE || 'client'; const r=new URLSearchParams(location.search).get('room'); if(r) document.getElementById('room-code').value=r; });
+window.addEventListener('DOMContentLoaded', () => { myRole = window.ONT_ROLE || 'client'; const r=new URLSearchParams(location.search).get('room'); if(r) document.getElementById('room-code').value=r; const nameGroup=document.getElementById('client-name-group'); if(nameGroup) nameGroup.style.display=myRole==='client'?'block':'none'; });

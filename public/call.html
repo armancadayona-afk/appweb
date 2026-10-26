@@ -534,7 +534,13 @@
         <label for="room-code">Room Code</label>
         <input id="room-code" placeholder="Enter room code (e.g. room101)">
       </div>
+      <div class="form-group" id="client-name-group" style="display:none">
+        <label for="client-display-name">Your Name</label>
+        <input id="client-display-name" type="text" placeholder="Enter your name for the waiting room and chat" maxlength="40" minlength="2" autocomplete="name">
+        <div style="font-size:12px;color:#9eb3d0;margin-top:6px">The Admin will see this name when approving your request, and it will appear in chat.</div>
+      </div>
       <button class="btn-primary" id="btn-connect" onclick="connectCall()">Connect / Join Call</button>
+      <div id="waiting-message" style="display:none;margin-top:14px;padding:16px;background:#142b46;border:1px solid #315575;border-radius:10px;color:#e4efff;text-align:center;line-height:1.6">⏳ Waiting for Admin approval.<div style="font-size:12px;opacity:.8">Your camera and microphone are not shared while waiting.</div><button type="button" onclick="endCall()" style="margin-top:12px;padding:8px 14px;border-radius:8px;cursor:pointer">Cancel Request</button></div>
       <div id="modal-status" style="margin-top:10px; font-size:12px; color:#ef4444;"></div>
     </div>
   </div>
@@ -611,6 +617,11 @@
             <!-- Participants added dynamically -->
           </div>
         </div>
+      </div>
+
+      <div id="waiting-requests-panel" class="panel-card" style="display:none">
+        <div class="controls-title">⏳ Waiting Room <span id="waiting-count">(0)</span></div>
+        <div id="waiting-requests-list" style="padding:12px;display:grid;gap:10px"></div>
       </div>
 
       <!-- Call Controls Panel -->

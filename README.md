@@ -46,3 +46,11 @@ The signaling server URL is automatically derived from the current website and i
 - Admin authentication still requires `ADMIN_PASSWORD`; a hidden URL is not a replacement for a password.
 - Do not change `SESSION_SECRET` unless you intend to change the private Admin link and invalidate existing sessions.
 - The WebRTC and local video broadcast code is retained; actual media playback must be tested after deploying.
+
+
+## Waiting Room Approval
+Clients who request to join remain in a waiting room. The Admin sees pending requests in a Waiting Room panel and can Approve or Deny. Only approved clients enter the peer map and receive signaling/media/chat. Camera/microphone permission is requested after approval, not while waiting. Pending clients are removed on disconnect; Admin room closure rejects all pending requests.
+
+
+## Client display names
+After entering a room code, Clients enter a name (2–40 characters) before requesting admission. The server validates the name, shows it to the Admin in the waiting room, and uses it in the participant list and chat after approval. Names are session-only; no registration or database is required.

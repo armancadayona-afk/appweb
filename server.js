@@ -118,6 +118,7 @@ wss.on('connection', (ws, req) => {
       const roomData = {
         adminId: currentPeerId,
         nextWorkerNum: 1,
+        pending: new Map(),
         peers: new Map()
       };
       const peerInfo = { ws, role: 'admin', displayName: 'Admin' };
@@ -143,42 +144,43 @@ wss.on('connection', (ws, req) => {
       }
 
       const roomData = rooms.get(roomCode);
-      if (roomData.peers.size >= 5) {
-        return send(ws, { type: 'error', message: 'Room is full (maximum 4 workers allowed).' });
+      if (roomData.peers.size + roomData.pending.size >= 5) {
+        return send(ws, { type:'error', message:'Room is full (maximum 4 clients including waiting).' });
       }
-
-      const workerNum = roomData.nextWorkerNum++;
-      const displayName = `Worker ${workerNum}`;
-      currentPeerId = 'client_' + generatePeerId();
+      currentPeerId = 'client_' + crypto.randomBytes(8).toString('hex');
       currentRoom = roomCode;
+      const displayName = String(data.displayName || '').trim().replace(/\s+/g, ' ');
+      if (displayName.length < 2 || displayName.length > 40 || /[<>\x00-\x1f\x7f]/.test(displayName)) {
+        return send(ws, { type:'error', message:'Please enter a name (2–40 characters).' });
+      }
+      roomData.pending.set(currentPeerId, { ws, role:'client', displayName });
+      send(ws, { type:'waiting', room:roomCode, peerId:currentPeerId, message:'Waiting for Admin approval.' });
+      const admin = roomData.peers.get(roomData.adminId);
+      if (admin) send(admin.ws, {type:'join-request', peerId:currentPeerId, displayName});
+      return;
+    }
 
+    if (type === 'approve-join' || type === 'deny-join') {
+      if (!adminAuthenticated || !currentRoom || !rooms.has(currentRoom)) return;
+      const roomData = rooms.get(currentRoom);
+      if (currentPeerId !== roomData.adminId) return;
+      const pending = roomData.pending.get(String(target || ''));
+      if (!pending) return send(ws,{type:'error',message:'Request expired or no longer pending.'});
+      roomData.pending.delete(target);
+      if (type === 'deny-join') {
+        send(pending.ws, {type:'join-denied', message:'The Admin declined your request.'});
+        pending.ws.close(1000, 'Denied');
+        return;
+      }
       const existingPeers = Array.from(roomData.peers.entries()).map(([id, info]) => ({
-        peerId: id,
-        role: info.role,
-        displayName: info.displayName
+        peerId:id, role:info.role, displayName:info.displayName
       }));
-
-      const peerInfo = { ws, role: 'client', displayName };
-      roomData.peers.set(currentPeerId, peerInfo);
-
-      send(ws, {
-        type: 'joined',
-        peerId: currentPeerId,
-        room: roomCode,
-        role: 'client',
-        displayName,
-        peers: existingPeers
-      });
-
+      roomData.peers.set(target, pending);
+      send(pending.ws, {type:'joined', peerId:target, room:currentRoom,
+        role:'client', displayName:pending.displayName, peers:existingPeers});
       for (const [id, info] of roomData.peers) {
-        if (id !== currentPeerId) {
-          send(info.ws, {
-            type: 'peer-joined',
-            peerId: currentPeerId,
-            role: 'client',
-            displayName
-          });
-        }
+        if (id !== target) send(info.ws,{type:'peer-joined', peerId:target,
+          role:'client', displayName:pending.displayName});
       }
       return;
     }
@@ -226,7 +228,12 @@ wss.on('connection', (ws, req) => {
   function leaveRoom() {
     if (!currentRoom || !rooms.has(currentRoom)) return;
     const roomData = rooms.get(currentRoom);
+    const wasPending = roomData.pending.delete(currentPeerId);
     roomData.peers.delete(currentPeerId);
+    if (wasPending) {
+      const admin = roomData.peers.get(roomData.adminId);
+      if (admin) send(admin.ws,{type:'request-cancelled',peerId:currentPeerId});
+    }
 
     for (const [id, info] of roomData.peers) {
       send(info.ws, {
@@ -237,6 +244,7 @@ wss.on('connection', (ws, req) => {
 
     if (currentPeerId === roomData.adminId) {
       for (const info of roomData.peers.values()) send(info.ws,{type:'error',message:'Admin closed the room'});
+      for (const info of roomData.pending.values()) { send(info.ws,{type:'join-denied',message:'Room closed by Admin'}); info.ws.close(1000,'Room closed'); }
       rooms.delete(currentRoom);
     } else if (roomData.peers.size === 0) {
       rooms.delete(currentRoom);
